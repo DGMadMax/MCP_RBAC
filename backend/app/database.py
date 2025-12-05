@@ -41,7 +41,7 @@ def init_database() -> None:
     """
     logger.info("Initializing database...")
     Base.metadata.create_all(bind=engine)
-    logger.info("✅ Database tables created successfully")
+    logger.info("[OK] Database tables created successfully")
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -66,6 +66,6 @@ def drop_all_tables() -> None:
     Drop all tables (use with caution!)
     Useful for testing or complete reset
     """
-    logger.warning("⚠️ Dropping all database tables...")
+    logger.warning("[WARN] Dropping all database tables...")
     Base.metadata.drop_all(bind=engine)
-    logger.info("✅ All tables dropped")
+    logger.info("[OK] All tables dropped")

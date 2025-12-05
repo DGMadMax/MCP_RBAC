@@ -79,8 +79,8 @@ const ChatMessage = ({ message, onFeedback }: { message: Message; onFeedback?: (
       <div className="flex flex-col max-w-[80%] md:max-w-[70%]">
         <div
           className={`rounded-2xl px-4 py-3 ${message.role === 'user'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-100 dark:bg-gray-800'
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-100 dark:bg-gray-800'
             }`}
         >
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
@@ -126,8 +126,8 @@ const ChatMessage = ({ message, onFeedback }: { message: Message; onFeedback?: (
             <button
               onClick={() => handleFeedback(true)}
               className={`p-1.5 rounded-lg transition-colors ${feedback === true
-                  ? 'bg-green-100 dark:bg-green-900'
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-green-100 dark:bg-green-900'
+                : 'hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               title="Helpful"
             >
@@ -136,8 +136,8 @@ const ChatMessage = ({ message, onFeedback }: { message: Message; onFeedback?: (
             <button
               onClick={() => handleFeedback(false)}
               className={`p-1.5 rounded-lg transition-colors ${feedback === false
-                  ? 'bg-red-100 dark:bg-red-900'
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-red-100 dark:bg-red-900'
+                : 'hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               title="Not helpful"
             >
@@ -220,15 +220,9 @@ export default function ChatInterface() {
     setThinkingStatus('Initializing...');
     setError(null);
 
-    // Create a placeholder message for the assistant
+    // Create message ID for the assistant response
     const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
+    let messageAdded = false;
 
     try {
       // Use fetch for SSE streaming
@@ -274,19 +268,34 @@ export default function ChatInterface() {
                 setThinkingStatus(data.message);
               } else if (data.type === 'chunk') {
                 accumulatedContent += data.content;
-                // Update the last message
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent }
-                    : msg
-                ));
+
+                // Add message on first chunk, then update
+                if (!messageAdded) {
+                  const assistantMessage: Message = {
+                    id: assistantMessageId,
+                    role: 'assistant',
+                    content: accumulatedContent,
+                    timestamp: new Date(),
+                  };
+                  setMessages((prev) => [...prev, assistantMessage]);
+                  messageAdded = true;
+                } else {
+                  // Update the message
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: accumulatedContent }
+                      : msg
+                  ));
+                }
               } else if (data.type === 'sources') {
                 sources = data.sources;
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, sources: sources }
-                    : msg
-                ));
+                if (messageAdded) {
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, sources: sources }
+                      : msg
+                  ));
+                }
               } else if (data.type === 'done') {
                 setIsThinking(false);
                 setThinkingStatus('');
@@ -304,12 +313,23 @@ export default function ChatInterface() {
       console.error('Chat error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
 
-      // Update the error message
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantMessageId
-          ? { ...msg, content: `❌ Error: ${err instanceof Error ? err.message : 'An error occurred'}. Please try again.` }
-          : msg
-      ));
+      // Add error message if no response was received yet
+      if (!messageAdded) {
+        const errorMessage: Message = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: `Error: ${err instanceof Error ? err.message : 'An error occurred'}. Please try again.`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } else {
+        // Update existing message with error
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: `${msg.content}\n\nError: ${err instanceof Error ? err.message : 'An error occurred'}` }
+            : msg
+        ));
+      }
     } finally {
       setIsThinking(false);
       setThinkingStatus('');

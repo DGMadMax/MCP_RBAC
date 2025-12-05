@@ -62,6 +62,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
 
+        // Clear chat history to prevent data leaking between users
+        localStorage.removeItem('rag_chatbot_history');
+        localStorage.removeItem('rag_chatbot_session');
+
         delete apiClient.defaults.headers.common['Authorization'];
 
         setState({

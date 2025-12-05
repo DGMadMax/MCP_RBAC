@@ -1,24 +1,32 @@
 # Core dependencies
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-dotenv==1.0.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 
 # Database
-sqlalchemy==2.0.25
-aiosqlite==0.19.0
+sqlalchemy>=2.0.25
+aiosqlite>=0.19.0
 
 # Authentication
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt==4.0.1
+python-multipart>=0.0.6
+email-validator>=2.0.0
 
-# LLM & AI (Updated for compatibility)
+# LLM & AI
 langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-groq>=0.1.0
+langchain-huggingface>=0.0.3
 langgraph>=0.1.0
+
+# MCP (Model Context Protocol)
+mcp>=1.0.0
+
+# Web Search
 tavily-python>=0.3.0
 
 # Vector Store & Embeddings

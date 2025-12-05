@@ -52,6 +52,7 @@ class Token(BaseModel):
 class ChatRequest(BaseModel):
     """Chat request"""
     query: str = Field(..., min_length=1, max_length=1000)
+    session_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

@@ -23,7 +23,7 @@ class JinaReranker:
         self.model = settings.jina_model
         self.api_url = "https://api.jina.ai/v1/rerank"
         
-        logger.info(f"✅ Jina reranker initialized (model: {self.model})")
+        logger.info(f"[OK] Jina reranker initialized (model: {self.model})")
     
     async def rerank(
         self,

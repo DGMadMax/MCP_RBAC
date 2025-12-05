@@ -1,155 +1,121 @@
-# Test Suite - RBAC Agentic AI Chatbot
+# RBAC Agentic AI Chatbot - Test Suite
 
-## 📦 Installation
+Production-grade unit tests for the MCP + LangGraph architecture.
+
+## Test Files
+
+| File | Coverage |
+|------|----------|
+| `test_mcp_server.py` | MCP tools (RAG, SQL, Web, Weather) |
+| `test_agent_graph.py` | LangGraph agent (router, executor, generator) |
+| `test_api_routes.py` | API routes, auth, rate limiting |
+| `test_rag_pipeline.py` | RAG pipeline (vector, BM25, fusion) |
+| `test_auth.py` | JWT authentication, password hashing |
+| `conftest.py` | Pytest fixtures and configuration |
+
+## Running Tests
 
 ```bash
-# Install test dependencies
-pip install -r requirements-test.txt
+# From backend directory
+cd backend
+
+# Run all tests
+py -m pytest tests/ -v
+
+# Run specific test file
+py -m pytest tests/test_mcp_server.py -v
+
+# Run with coverage
+py -m pytest tests/ --cov=app --cov-report=html
+
+# Run only async tests
+py -m pytest tests/ -v -m asyncio
 ```
 
-## 🧪 Running Tests
-
-### Run all tests
-```bash
-pytest
-```
-
-### Run with coverage
-```bash
-pytest --cov=app --cov-report=html
-```
-
-### Run specific test file
-```bash
-pytest tests/test_auth.py
-```
-
-### Run specific test class
-```bash
-pytest tests/test_auth.py::TestPasswordHashing
-```
-
-### Run specific test
-```bash
-pytest tests/test_auth.py::TestPasswordHashing::test_hash_password
-```
-
-### Run with verbose output
-```bash
-pytest -v
-```
-
-### Run only fast tests (skip slow ones)
-```bash
-pytest -m "not slow"
-```
-
-## 📁 Test Structure
+## Test Architecture
 
 ```
 tests/
-├── __init__.py
-├── conftest.py              # Fixtures & configuration
-├── test_auth.py             # Authentication tests
-├── test_rag_pipeline.py     # RAG pipeline tests
-├── test_agent_nodes.py      # LangGraph agent tests
-├── test_api_routes.py       # FastAPI routes tests
-└── test_mcp_client.py       # MCP client tests
+├── conftest.py           # Shared fixtures (test_db, test_user, mock data)
+├── test_mcp_server.py    # MCP tool unit tests
+├── test_agent_graph.py   # LangGraph workflow tests
+├── test_api_routes.py    # FastAPI route tests
+├── test_rag_pipeline.py  # RAG component tests
+└── test_auth.py          # Authentication tests
 ```
 
-## 🎯 Test Coverage
+## Key Fixtures
 
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| Authentication | 8 | Password hashing, JWT tokens, User model |
-| RAG Pipeline | 9 | RRF fusion, Vector search, BM25, Jina reranker |
-| Agent Nodes | 8 | Orchestrator, Query rewriter, Tool executor, Synthesizer |
-| API Routes | 10 | Auth routes, Chat routes, Health checks, RBAC |
-| MCP Client | 8 | Base client, RAG/SQL/Web/Weather clients |
+| Fixture | Description |
+|---------|-------------|
+| `test_db` | In-memory SQLite database |
+| `test_user` | Engineering team user |
+| `test_admin_user` | C-Level admin user |
+| `auth_headers` | JWT auth headers for test_user |
+| `admin_auth_headers` | JWT auth headers for admin |
+| `mock_rag_results` | Mock RAG search results |
+| `mock_sql_results` | Mock SQL query results |
 
-**Total**: ~43 unit tests
+## Test Categories
 
-## 🏗️ Test Fixtures
+### 1. MCP Server Tests (`test_mcp_server.py`)
+- `TestSearchDocuments` - RAG tool with RBAC filtering
+- `TestQueryDatabase` - SQL tool with role restrictions
+- `TestWebSearch` - Tavily web search integration
+- `TestGetWeather` - Open-Meteo weather API
+- `TestMCPServerInit` - Server initialization
+- `TestSettingsIntegration` - Config settings
 
-### Database Fixtures
-- `test_db` - In-memory SQLite database
-- `test_user` - Engineering team user
-- `test_admin_user` - C-Level admin user
-- `test_employee` - Employee record
+### 2. Agent Graph Tests (`test_agent_graph.py`)
+- `TestRouterNode` - Intent classification
+- `TestToolExecutorNode` - Tool execution
+- `TestGeneratorNode` - Response synthesis
+- `TestAgentGraph` - Graph compilation
+- `TestConditionalRouting` - Edge conditions
 
-### Auth Fixtures
-- `auth_headers` - JWT auth headers for regular user
-- `admin_auth_headers` - JWT auth headers for admin
+### 3. API Route Tests (`test_api_routes.py`)
+- `TestAuthRoutes` - Register, login
+- `TestHealthRoutes` - Health checks
+- `TestChatRoutes` - Chat endpoints
+- `TestRateLimiting` - SlowAPI rate limits
+- `TestRBACFiltering` - Role-based access
 
-### Mock Data Fixtures
-- `mock_rag_results` - Mock RAG search results
-- `mock_sql_results` - Mock SQL query results
-- `mock_web_results` - Mock web search results
-- `mock_weather_results` - Mock weather data
+## Mocking Strategy
 
-## ✅ What's Tested
+External services are mocked to ensure:
+- Fast test execution
+- No API costs during testing
+- Consistent test results
 
-### ✓ Authentication
-- Password hashing (bcrypt)
-- Password verification
-- JWT token creation
-- JWT token verification
-- User model CRUD
-
-### ✓ RAG Pipeline
-- RRF fusion algorithm
-- Vector search initialization
-- BM25 search initialization
-- Jina reranker (success & fallback)
-
-### ✓ Agent Nodes
-- Intent classification (greeting, rag, sql, web, weather)
-- Query rewriting (single & multi-part)
-- Parallel tool execution
-- Response synthesis
-
-### ✓ API Routes
-- User registration (success & duplicate email)
-- User login (success & wrong password)
-- Health checks
-- Chat history with auth
-- RBAC filtering
-
-### ✓ MCP Client
-- Successful API calls
-- Timeout handling
-- HTTP error handling
-- All 4 specific clients (RAG, SQL, Web, Weather)
-
-## 🔍 Mocking Strategy
-
-Tests use `unittest.mock` to mock external dependencies:
-- **LLM calls** (Groq) - Mocked to avoid API costs
-- **Embeddings** (HuggingFace) - Mocked to avoid downloads
-- **Reranker** (Jina) - Mocked to avoid API calls
-- **Web search** (Perplexity) - Mocked
-- **Weather API** (Open-Meteo) - Mocked
-- **HTTP clients** - Mocked with httpx responses
-
-## 📊 Example Test Output
-
-```
-tests/test_auth.py::TestPasswordHashing::test_hash_password PASSED         [ 12%]
-tests/test_auth.py::TestPasswordHashing::test_verify_password_correct PASSED [ 25%]
-tests/test_auth.py::TestJWT::test_create_access_token PASSED              [ 37%]
-tests/test_rag_pipeline.py::TestRRFFusion::test_rrf_fusion_basic PASSED   [ 50%]
-tests/test_agent_nodes.py::TestOrchestratorNode::test_orchestrator_greeting_intent PASSED [ 62%]
-tests/test_api_routes.py::TestAuthRoutes::test_register_user_success PASSED [ 75%]
-tests/test_mcp_client.py::TestRAGClient::test_rag_client_search PASSED    [ 87%]
-
-======================== 43 passed in 2.34s ========================
+```python
+# Example: Mocking Groq LLM
+@pytest.fixture
+def mock_groq_llm():
+    with patch('app.agent.graph.ChatGroq') as mock:
+        llm = MagicMock()
+        llm.ainvoke = AsyncMock(return_value=MagicMock(content="response"))
+        mock.return_value = llm
+        yield llm
 ```
 
-## 🚀 Next Steps
+## CI/CD Integration
 
-To improve test coverage:
-1. Add integration tests for full chat flow
-2. Add load tests with Locust
-3. Add E2E tests for MCP server communication
-4. Add property-based tests with Hypothesis
-5. Increase coverage to >80%
+Tests are designed for CI/CD pipelines:
+
+```yaml
+# GitHub Actions example
+- name: Run Tests
+  run: |
+    cd backend
+    pip install -r requirements.txt
+    pip install pytest pytest-asyncio pytest-cov
+    pytest tests/ -v --cov=app
+```
+
+## Adding New Tests
+
+1. Add fixtures to `conftest.py` if reusable
+2. Create test class with descriptive name
+3. Use `@pytest.mark.asyncio` for async tests
+4. Mock external dependencies
+5. Test both success and error cases

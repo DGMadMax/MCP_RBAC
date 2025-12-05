@@ -33,7 +33,7 @@ class RAGPipeline:
         self.bm25_engine = BM25SearchEngine()
         self.reranker = JinaReranker()
         
-        logger.info("✅ RAG pipeline ready")
+        logger.info("[OK] RAG pipeline ready")
     
     async def retrieve(
         self,
@@ -148,7 +148,7 @@ class RAGPipeline:
         total_time = (time.time() - start_time) * 1000
         
         logger.info(
-            f"✅ RAG pipeline complete | "
+            f"[OK] RAG pipeline complete | "
             f"Total: {total_time:.2f}ms | "
             f"Vector: {vector_time:.2f}ms | "
             f"BM25: {bm25_time:.2f}ms | "

@@ -2,7 +2,9 @@
 Agent State - TypedDict for LangGraph
 """
 
-from typing import TypedDict, List, Optional, Dict, Any
+from typing import TypedDict, List, Optional, Dict, Any, Annotated
+from langgraph.graph.message import add_messages
+from langchain_core.messages import BaseMessage
 
 
 class AgentState(TypedDict):
@@ -14,30 +16,31 @@ class AgentState(TypedDict):
     user_id: int
     user_role: str
     user_department: str
+    session_id: str
     
-    # Query processing
+    # Messages (with memory - using add_messages reducer)
+    messages: Annotated[List[BaseMessage], add_messages]
+    
+    # Current query
     original_query: str
-    rewritten_queries: List[str]
-    is_multi_query: bool
+    rewritten_query: str
     
-    # Chat history (last 4 messages)
-    chat_history: List[Dict[str, str]]
+    # Iteration control
+    iteration_count: int
+    max_iterations: int  # Default: 5
     
     # Intent classification
-    intent: str  # "greeting", "sql", "web", "weather", "rag", "multi_tool"
-    tools_to_call: List[str]  # e.g., ["rag", "sql"]
+    intent: str  # "greeting", "sql", "web", "weather", "rag", "unknown"
+    selected_tool: Optional[str]  # Which tool to call
     
     # Tool results
-    rag_results: Optional[Dict[str, Any]]
-    sql_results: Optional[Dict[str, Any]]
-    web_results: Optional[Dict[str, Any]]
-    weather_results: Optional[Dict[str, Any]]
+    tool_result: Optional[str]
     
     # Final output
     final_response: str
     sources: List[Dict[str, str]]
-    confidence: str
     
-    # Metadata (for SSE streaming)
-    status_updates: List[str]
-    current_stage: str
+    # Status for SSE streaming
+    current_status: str
+    is_complete: bool
+    needs_more_info: bool

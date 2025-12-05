@@ -1,10 +1,12 @@
 """
-Chat Routes - Main Chat Endpoints with SSE Streaming
+Chat Routes - Main Chat Endpoints with SSE Streaming and Rate Limiting
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import json
 import asyncio
 from datetime import datetime
@@ -13,139 +15,105 @@ from app.database import get_db
 from app.models import User, ChatHistory
 from app.schemas import ChatRequest, ChatResponse, ChatHistoryResponse
 from app.auth import get_current_user
-from app.agent import agent_graph, agent_memory
-from app.agent.state import AgentState
+from app.agent.graph import run_agent
 from app.logger import get_logger
+from app.config import settings
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
+# Rate limiter - uses the limiter from main.py
+limiter = Limiter(key_func=get_remote_address)
 
-def get_last_n_messages(user_id: int, db: Session, n: int = 4):
+
+def get_chat_history_messages(user_id: int, db: Session, n: int = 6):
     """
-    Get last N chat messages for user
-    
-    Args:
-        user_id: User ID
-        db: Database session
-        n: Number of messages to retrieve
-    
-    Returns:
-        List of chat messages
+    Get last N chat messages for user as LangChain messages.
     """
+    from langchain_core.messages import HumanMessage, AIMessage
+    
     history = db.query(ChatHistory).filter(
         ChatHistory.user_id == user_id
     ).order_by(
         ChatHistory.created_at.desc()
     ).limit(n).all()
     
-    return [
-        {"query": h.query, "response": h.response}
-        for h in reversed(history)
-    ]
+    messages = []
+    for h in reversed(history):
+        messages.append(HumanMessage(content=h.query))
+        messages.append(AIMessage(content=h.response))
+    
+    return messages
 
 
 @router.post("/stream")
+@limiter.limit(f"{settings.rate_limit_per_user}/minute")
 async def stream_chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Chat with SSE streaming
+    Chat with SSE streaming.
     
     Streams real-time updates:
     - Status updates (classifying, searching, generating)
-    - LLM response chunks
-    - Tool execution metadata
-    - Final sources/citations
+    - Final response
+    - Sources/citations
     """
     async def event_generator():
         try:
-            # Build initial state
-            chat_history = get_last_n_messages(user.id, db, n=4)
-            
-            state: AgentState = {
-                "user_id": user.id,
-                "user_role": user.role,
-                "user_department": user.department,
-                "original_query": request.query,
-                "rewritten_queries": [],
-                "is_multi_query": False,
-                "chat_history": chat_history,
-                "intent": "",
-                "tools_to_call": [],
-                "rag_results": None,
-                "sql_results": None,
-                "web_results": None,
-                "weather_results": None,
-                "final_response": "",
-                "sources": [],
-                "confidence": "",
-                "status_updates": [],
-                "current_stage": "orchestrating"
-            }
+            # Get chat history
+            chat_history = get_chat_history_messages(user.id, db, n=6)
+            session_id = f"user_{user.id}_{chat_request.session_id or 'default'}"
             
             # Send initial status
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing your question...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting...'})}\n\n"
             
-            # Execute agent graph with streaming
-            config = {"configurable": {"thread_id": str(user.id)}}
+            # Run agent with streaming
+            final_response = ""
+            sources = []
             
-            async for event in agent_graph.astream(state, config=config):
-                node_name = list(event.keys())[0]
-                node_state = event[node_name]
-                
-                # Send status updates based on stage
-                if node_name == "orchestrator":
-                    intent = node_state.get("intent", "")
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Intent: {intent}'})}\n\n"
-                
-                elif node_name == "query_rewriter":
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Refining query...'})}\n\n"
-                
-                elif node_name == "tool_executor":
-                    tools = node_state.get("tools_to_call", [])
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Using tools: {tools}'})}\n\n"
-                    
-                    # Send tool results
-                    for tool in tools:
-                        result_key = f"{tool}_results"
-                        if node_state.get(result_key):
-                            yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool})}\n\n"
-                
-                elif node_name == "synthesizer":
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
+            async for event in run_agent(
+                query=chat_request.query,
+                user_id=user.id,
+                user_role=user.role,
+                user_department=user.department,
+                session_id=session_id,
+                chat_history=chat_history
+            ):
+                if event["type"] == "status":
+                    yield f"data: {json.dumps({'type': 'status', 'message': event['content']})}\n\n"
+                elif event["type"] == "response":
+                    final_response = event["content"]
+                    sources = event.get("sources", [])
                     
                     # Stream response in chunks
-                    response = node_state.get("final_response", "")
-                    words = response.split()
-                    
-                    for i in range(0, len(words), 5):  # Stream 5 words at a time
+                    words = final_response.split()
+                    for i in range(0, len(words), 5):
                         chunk = " ".join(words[i:i+5]) + " "
                         yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-                        await asyncio.sleep(0.05)  # Small delay for streaming effect
-                    
-                    # Send sources
-                    sources = node_state.get("sources", [])
-                    if sources:
-                        yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+                        await asyncio.sleep(0.03)
             
             # Save to chat history
-            final_state = state
-            chat_entry = ChatHistory(
-                user_id=user.id,
-                query=request.query,
-                response=final_state["final_response"],
-                tools_used=final_state.get("tools_to_call", []),
-                sources=final_state.get("sources", []),
-                intent=final_state.get("intent", "")
-            )
-            db.add(chat_entry)
-            db.commit()
+            if final_response:
+                chat_entry = ChatHistory(
+                    user_id=user.id,
+                    query=chat_request.query,
+                    response=final_response,
+                    tools_used=[],
+                    sources=sources,
+                    intent=""
+                )
+                db.add(chat_entry)
+                db.commit()
             
-            # Send done event
+            # Send sources and done
+            if sources:
+                yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+            
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
         except Exception as e:
@@ -163,8 +131,10 @@ async def stream_chat(
 
 
 @router.post("", response_model=ChatResponse)
+@limiter.limit(f"{settings.rate_limit_per_user}/minute")
 async def chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -172,42 +142,32 @@ async def chat(
     Synchronous chat (non-streaming)
     """
     try:
-        # Build state
-        chat_history = get_last_n_messages(user.id, db, n=4)
+        chat_history = get_chat_history_messages(user.id, db, n=6)
+        session_id = f"user_{user.id}_{chat_request.session_id or 'default'}"
         
-        state: AgentState = {
-            "user_id": user.id,
-            "user_role": user.role,
-            "user_department": user.department,
-            "original_query": request.query,
-            "rewritten_queries": [],
-            "is_multi_query": False,
-            "chat_history": chat_history,
-            "intent": "",
-            "tools_to_call": [],
-            "rag_results": None,
-            "sql_results": None,
-            "web_results": None,
-            "weather_results": None,
-            "final_response": "",
-            "sources": [],
-            "confidence": "",
-            "status_updates": [],
-            "current_stage": ""
-        }
+        final_response = ""
+        sources = []
         
-        # Execute agent
-        config = {"configurable": {"thread_id": str(user.id)}}
-        result = await agent_graph.ainvoke(state, config=config)
+        async for event in run_agent(
+            query=chat_request.query,
+            user_id=user.id,
+            user_role=user.role,
+            user_department=user.department,
+            session_id=session_id,
+            chat_history=chat_history
+        ):
+            if event["type"] == "response":
+                final_response = event["content"]
+                sources = event.get("sources", [])
         
         # Save to history
         chat_entry = ChatHistory(
             user_id=user.id,
-            query=request.query,
-            response=result["final_response"],
-            tools_used=result.get("tools_to_call", []),
-            sources=result.get("sources", []),
-            intent=result.get("intent", "")
+            query=chat_request.query,
+            response=final_response,
+            tools_used=[],
+            sources=sources,
+            intent=""
         )
         db.add(chat_entry)
         db.commit()
@@ -215,12 +175,12 @@ async def chat(
         logger.info(f"Chat completed for user {user.id}")
         
         return ChatResponse(
-            query=request.query,
-            response=result["final_response"],
-            tools_used=result.get("tools_to_call", []),
-            sources=result.get("sources", []),
-            intent=result.get("intent", ""),
-            confidence=result.get("confidence", "medium"),
+            query=chat_request.query,
+            response=final_response,
+            tools_used=[],
+            sources=sources,
+            intent="",
+            confidence="medium",
             timestamp=datetime.utcnow()
         )
         

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # LLM Configuration (Groq)
     # =============================================================================
     groq_api_key: str = Field(..., description="Groq API key")
-    groq_model: str = Field(default="llama-3.1-70b-versatile", description="Groq model name")
+    groq_model: str = Field(default="llama-3.3-70b-versatile", description="Groq model name")
     groq_temperature: float = Field(default=0.0, description="LLM temperature")
     
     # =============================================================================
@@ -61,13 +61,7 @@ class Settings(BaseSettings):
     rrf_k: int = Field(default=60, description="RRF constant")
     final_top_k: int = Field(default=3, description="Final top K after reranking")
     
-    # =============================================================================
-    # MCP Server URLs
-    # =============================================================================
-    mcp_rag_url: str = Field(default="http://localhost:8001", description="RAG MCP server URL")
-    mcp_sql_url: str = Field(default="http://localhost:8002", description="SQL MCP server URL")
-    mcp_web_url: str = Field(default="http://localhost:8003", description="Web MCP server URL")
-    mcp_weather_url: str = Field(default="http://localhost:8004", description="Weather MCP server URL")
+    # Note: MCP servers are now unified in a single mcp_server.py
     
     # =============================================================================
     # Database Configuration
@@ -116,6 +110,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Ignore deprecated env vars like MCP URLs
 
 
 # =============================================================================

@@ -34,7 +34,7 @@ class VectorSearchEngine:
             persist_directory=settings.chromadb_path
         )
         
-        logger.info("✅ Vector search engine initialized")
+        logger.info("[OK] Vector search engine initialized")
     
     async def search(
         self,

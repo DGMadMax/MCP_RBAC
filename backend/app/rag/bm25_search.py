@@ -47,7 +47,7 @@ class BM25SearchEngine:
         # Build BM25 index
         self.bm25 = BM25Okapi(tokenized_corpus)
         
-        logger.info(f"✅ BM25 index built with {len(self.documents)} documents")
+        logger.info(f"[OK] BM25 index built with {len(self.documents)} documents")
     
     async def search(
         self,

@@ -41,20 +41,20 @@ class DataIngestion:
         self.departments = ["engineering", "finance", "general", "hr", "marketing"]
         
         # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path=settings.CHROMADB_PATH)
+        self.chroma_client = chromadb.PersistentClient(path=settings.chromadb_path)
         self.collection = self.chroma_client.get_or_create_collection(
             name="documents",
             metadata={"hnsw:space": "cosine"}
         )
         
         # Initialize embeddings model
-        log_info("Loading embedding model", model=settings.EMBEDDING_MODEL)
-        self.embedding_model = SentenceTransformer(settings.EMBEDDING_MODEL)
+        log_info("Loading embedding model", model=settings.embedding_model)
+        self.embedding_model = SentenceTransformer(settings.embedding_model)
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=settings.CHUNK_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", " ", ""]
         )
