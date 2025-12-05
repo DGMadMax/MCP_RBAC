@@ -82,7 +82,7 @@ def seed_users(db: Session) -> None:
         existing_user = db.query(User).filter(User.email == user_data["email"]).first()
         
         if existing_user:
-            logger.info(f"✓ User already exists: {user_data['email']} (skipping)")
+            logger.info(f"[EXISTS] User already exists: {user_data['email']} (skipping)")
             skipped_count += 1
             continue
         
@@ -98,7 +98,7 @@ def seed_users(db: Session) -> None:
         
         db.add(user)
         logger.info(
-            f"✓ Created user: {user_data['email']} | "
+            f"[CREATED] Created user: {user_data['email']} | "
             f"Role: {user_data['role']} | "
             f"Department: {user_data['department']}"
         )

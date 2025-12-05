@@ -1,7 +1,11 @@
 """
 MCP Server - RBAC Chatbot Tools
 Single MCP server with 4 async tools: RAG, SQL, Web Search, Weather
+
 Uses official MCP library with @mcp.tool() decorators
+Server is mounted to FastAPI at /mcp endpoint for Streamable HTTP transport
+
+Reference: https://github.com/modelcontextprotocol/python-sdk
 """
 
 from mcp.server.fastmcp import FastMCP
@@ -14,11 +18,30 @@ from app.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Initialize MCP Server
+# Initialize MCP Server with Streamable HTTP configuration
+# stateless_http=True: Recommended for production (scalable, no session state)
+# json_response=True: Better performance than SSE for most use cases
+# streamable_http_path="/": Mount at root of wherever it's mounted (results in /mcp endpoint)
 mcp = FastMCP(
     name="RBAC Chatbot Tools",
-    instructions="Tools for searching documents, querying databases, web search, and weather."
+    instructions="Tools for searching documents, querying databases, web search, and weather.",
+    stateless_http=True,
+    json_response=True,
 )
+
+# Configure path for mounting (endpoint will be at /mcp instead of /mcp/mcp)
+mcp.settings.streamable_http_path = "/"
+
+
+def get_mcp_app():
+    """
+    Get the Streamable HTTP ASGI app for mounting to FastAPI/Starlette.
+    
+    Usage in main.py:
+        from starlette.routing import Mount
+        Mount("/mcp", app=get_mcp_app())
+    """
+    return mcp.streamable_http_app()
 
 
 # =============================================================================
@@ -123,11 +146,33 @@ async def query_database(
             temperature=settings.groq_temperature
         )
         
+        # Define schema for context
+        schema_info = """
+Table: employees
+Columns:
+- id (Integer)
+- employee_id (String)
+- full_name (String)  <-- Use this for names
+- role (String)
+- department (String)
+- email (String)
+- location (String)
+- salary (Float)
+- leave_balance (Integer)
+- performance_rating (Integer)
+- date_of_joining (Date)
+"""
+
         prompt = f"""Convert this natural language query to SQL.
+Use SQLite syntax.
+
+Schema:
+{schema_info}
+
 Only use these tables: {', '.join(allowed_tables)}
 Query: {query}
 
-Return ONLY the SQL query, nothing else. Use SQLite syntax.
+Return ONLY the SQL query, nothing else.
 If the query cannot be answered with available tables, return: SELECT 'Access denied or table not available' as error;
 """
         

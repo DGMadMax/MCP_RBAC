@@ -168,7 +168,7 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     database: str
-    mcp_servers: Dict[str, str]
+    mcp_server: Dict[str, Any]  # Updated for new MCP architecture
 
 
 class MCPServerHealth(BaseModel):

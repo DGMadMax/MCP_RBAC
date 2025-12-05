@@ -88,20 +88,22 @@ Respond with ONLY the category name (rag, sql, web, weather, greeting, or unknow
 
 
 # =============================================================================
-# Node: Tool Executor - Call the selected MCP tool
+# Node: Tool Executor - Call the selected MCP tool via MCP Client
 # =============================================================================
 async def tool_executor_node(state: AgentState) -> AgentState:
     """
-    Execute the selected tool via MCP.
+    Execute the selected tool via MCP Client.
+    Uses official MCP protocol with ClientSession and Streamable HTTP transport.
     """
-    from app.mcp_server import search_documents, query_database, web_search, get_weather
+    # Import MCP Client functions (these use proper MCP protocol)
+    from app.mcp_client import search_documents, query_database, web_search, get_weather
     
     tool = state.get("selected_tool")
     query = state.get("rewritten_query") or state["original_query"]
     
     state["current_status"] = f"Searching with {tool} tool..."
     
-    logger.info(f"[TOOL] Executing: {tool}")
+    logger.info(f"[TOOL] Executing via MCP: {tool}")
     
     try:
         if tool == "rag":
